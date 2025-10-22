@@ -1,0 +1,22 @@
+# Copy this file to .env and fill in your actual values
+
+# Omi API Key (get from Omi app Settings > Developer)
+OMI_API_KEY=omi_dev_your_key_here
+
+# Flask Environment
+FLASK_ENV=development
+
+# PostgreSQL Database URL
+# Format: postgresql://username:password@localhost:5432/database_name
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/omi-link
+
+# OpenAI API Key (get from https://platform.openai.com/api-keys)
+OPENAI_API_KEY=sk-your-openai-key-here
+
+# Phone Number (for SMS notifications)
+# Format: 10-digit number for US/Canada, E.164 format for international
+PHONE_NUMBER=5555555555
+
+# Textbelt API Key (get from https://textbelt.com - use 'textbelt' for free tier)
+TEXTBELT_API_KEY=textbelt
+
