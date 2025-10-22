@@ -3,16 +3,19 @@ Jarvis AI Agent using OpenAI Agents SDK
 Handles tool execution, conversation management, and web search automatically
 """
 
-from agents import Agent, Runner, WebSearchTool, SQLiteSession
+from agents import Agent, Runner, WebSearchTool
 from tools import send_text_message
+import sessions
 
 # Jarvis agent definition
 jarvis_agent = Agent(
     name="Jarvis",
-    instructions="""You are Jarvis, a high-tech, friendly AI personal assistant and secretary for Braden. 
+    instructions="""
+    
+You are Jarvis, a high-tech, friendly AI personal assistant and secretary for Braden. 
 
-IMPORTANT: Braden can ONLY see information if you text him. He cannot see your standard responses. 
-Think of texting like having a conversation over SMS - only text when it's natural to do so.
+IMPORTANT: Your responses are automatically sent to Braden via text message. 
+Keep your responses concise and text-message friendly.
 
 TOOLS AVAILABLE:
 
@@ -20,33 +23,25 @@ TOOLS AVAILABLE:
    - Weather forecasts, news, current events, sports scores, stock prices
    - Any factual information that may have changed recently
    
-2. Send Text Message - Send SMS to Braden's phone when:
-   - You have information to share
-   - He asks a direct question
-   - You need to send reminders or alerts
-   - It feels natural in the conversation flow
+2. Send Text Message - Use this tool to send ADDITIONAL texts during processing:
+   - Send immediate updates while you're still working on something
+   - Send multiple pieces of information separately
+   - For example: text a quick "Looking that up..." while doing a web search
    
-   When texting:
-   - Write naturally, as if texting a friend
-   - Keep each text to a normal text message length
-   - You can send multiple texts in a row if that's natural
-   - Be conversational and friendly
-   - You DON'T have to text every time - only when it makes sense
+   Your final response is ALWAYS texted automatically, so you don't need to use this tool 
+   for your main response - only for extra messages during processing.
 
 BEHAVIOR:
 - Be proactive and helpful
 - Use web search liberally for current information
-- Text naturally - don't be overly formal
-- If you search the web, text the results so Braden can see them
-- Remember: if you don't text it, Braden won't see it
+- Keep responses conversational and concise (like texting a friend)
+- Your response goes directly to Braden's phone, so write naturally
 
-IMPORTANT - DESCRIBE YOUR ACTIONS:
-- When you use tools, include a brief description of what you're doing
-- Example: "Let me check that for you..." (before web search)
-- Example: "I'll text you the info" (when sending a text)
-
-RESPONSE:
-- In your response, please provide a detailed description of what you did and why
+RESPONSE FORMAT:
+- Keep it brief and text-message friendly
+- Answer the question directly
+- If you used web search, mention what you found
+- No need to describe what you're doing unless it's helpful context
 """,
     model="gpt-5-mini",
     tools=[
@@ -55,45 +50,25 @@ RESPONSE:
     ],
 )
 
-# Session management (per user/device)
-# Key format: session_id from Omi device
-_sessions = {}
+# Note: Session management is now handled by sessions.py module
+# Uses OpenAI Conversations API with PostgreSQL persistence
 
-def get_or_create_session(session_id: str) -> SQLiteSession:
+def send_to_jarvis(transcript_text: str, omi_session_id: str):
     """
-    Get or create a conversation session for a user
-    
-    Args:
-        session_id: Session ID from Omi device
-        
-    Returns:
-        SQLiteSession instance
-    """
-    if session_id not in _sessions:
-        print(f"Creating new conversation session for {session_id}")
-        # Use in-memory SQLite database for session storage
-        _sessions[session_id] = SQLiteSession(
-            session_id=session_id,
-            db_path=":memory:"
-        )
-    return _sessions[session_id]
-
-def send_to_jarvis(transcript_text: str, session_id: str):
-    """
-    Send transcript to Jarvis agent
+    Send transcript to Jarvis agent with persistent conversation history
     
     Args:
         transcript_text: The formatted transcript
-        session_id: Session ID from Omi device
+        omi_session_id: Session ID from Omi device
         
     Returns:
         str: Jarvis's response text, or None if error
     """
     import asyncio
-    import threading
     
     try:
-        session = get_or_create_session(session_id)
+        # Get or create OpenAI Conversation session (with database persistence)
+        session = sessions.get_or_create_session(omi_session_id)
         
         print("\n" + "="*60)
         print("SENDING TO JARVIS (with Agents SDK):")
@@ -115,12 +90,15 @@ def send_to_jarvis(transcript_text: str, session_id: str):
         
         # Run the agent - SDK handles everything!
         # Tools are executed automatically
-        # Conversation history is maintained by session
+        # Conversation history is maintained by OpenAI Conversations API
         result = Runner.run_sync(
             jarvis_agent,
             transcript_text,
             session=session
         )
+        
+        # Save OpenAI conversation ID to database after first use
+        sessions.save_conversation_id_for_session(omi_session_id, session)
         
         print("\n" + "="*60)
         print("JARVIS RESPONSE:")

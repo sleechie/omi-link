@@ -87,6 +87,22 @@ def process_transcripts():
             print("ERROR: Failed to save user message")
             return
         
+        # ALWAYS text the AI response to user
+        print("\n" + "="*60)
+        print("SENDING AI RESPONSE VIA SMS")
+        print("="*60)
+        print(f"Response: {ai_response[:100]}{'...' if len(ai_response) > 100 else ''}")
+        print("="*60 + "\n")
+        
+        import sms
+        sms_result = sms.send_sms(ai_response)
+        
+        if sms_result and sms_result.get('success'):
+            print(f"✅ AI response texted successfully! Text ID: {sms_result.get('textId')}")
+        else:
+            error = sms_result.get('error', 'Unknown error') if sms_result else 'Failed'
+            print(f"❌ Failed to text AI response: {error}")
+        
         # Save AI response (tool execution handled by SDK)
         ai_message_id = db.save_message('ai', ai_response)
         

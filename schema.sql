@@ -27,10 +27,20 @@ CREATE TABLE IF NOT EXISTS transcripts (
     FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL
 );
 
+-- Table to store session mappings (Omi session_id -> OpenAI conversation_id)
+CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    omi_session_id VARCHAR(255) UNIQUE NOT NULL,
+    openai_conversation_id VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_transcripts_processed ON transcripts(processed);
 CREATE INDEX IF NOT EXISTS idx_transcripts_session_id ON transcripts(session_id);
 CREATE INDEX IF NOT EXISTS idx_transcripts_message_id ON transcripts(message_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_omi_id ON sessions(omi_session_id);
 CREATE INDEX IF NOT EXISTS idx_transcripts_received_at ON transcripts(received_at);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);
