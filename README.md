@@ -1,6 +1,16 @@
-# Omi AI Transcript System
+# Omi AI Transcript System - Jarvis
 
-A Flask application that receives real-time transcripts from your Omi Dev Kit 2 device, stores them in PostgreSQL, and creates an ongoing AI conversation using OpenAI GPT-5.
+A Flask application that receives real-time transcripts from your Omi Dev Kit 2 device, stores them in PostgreSQL, and creates an ongoing AI conversation with **Jarvis** - your personal AI assistant powered by OpenAI Agents SDK.
+
+## Features
+
+- 🎤 **Real-time Transcript Processing** - Receives webhooks from Omi device every 10 seconds
+- 🤖 **Jarvis AI Assistant** - Powered by OpenAI GPT-5 with persistent conversation memory
+- 🔍 **Web Search** - Jarvis can search the web for current information (weather, news, etc.)
+- 📱 **SMS Notifications** - All AI responses are automatically texted to your phone
+- 💾 **Persistent Sessions** - Conversations persist across restarts using OpenAI Conversations API
+- 🎯 **Activation Phrases** - Only activates when you say "Hey Jarvis" (and variations)
+- 🧠 **Context Aware** - Remembers previous conversations per device
 
 ## Quick Setup
 
@@ -20,9 +30,23 @@ pip install -r requirements.txt
 Copy `ENV_TEMPLATE.txt` to `.env` and fill in your credentials:
 
 ```
+# Omi Device API Key (optional for webhooks)
 OMI_API_KEY=your_omi_api_key
+
+# PostgreSQL Database Connection
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/omi-link
+
+# OpenAI API Key (for Jarvis AI)
 OPENAI_API_KEY=your_openai_api_key
+
+# Phone Number for SMS notifications (10-digit US format)
+PHONE_NUMBER=5555555555
+
+# Textbelt API Key (use 'textbelt' for free tier with 1 text/day)
+# Get a paid key at https://textbelt.com for unlimited texts
+TEXTBELT_API_KEY=textbelt
+
+# Flask Environment
 FLASK_ENV=development
 ```
 
@@ -79,9 +103,19 @@ In the Omi mobile app:
 
 ### 4. Test It Out
 
-- Speak near your Omi device
-- Watch your console for incoming transcripts
-- You should see detailed output for each webhook received
+**Option 1: With Omi Device**
+- Speak near your Omi device: "Hey Jarvis, what's the weather today?"
+- Watch your console for incoming transcripts and AI processing
+- Check your phone for SMS response from Jarvis
+
+**Option 2: Local Testing Script**
+```bash
+# Single message test
+python dev/test_jarvis.py "Hey Jarvis, what time is it?"
+
+# Interactive mode (continuous conversation)
+python dev/test_jarvis.py
+```
 
 ## Deploying to Railway
 
@@ -112,13 +146,22 @@ git push -u origin main
 4. Select your `omi-link` repository
 5. Railway will automatically detect the Flask app and deploy it
 
-### 4. Configure Environment Variables on Railway
+### 4. Add PostgreSQL Database
+
+1. In your Railway project, click "New"
+2. Select "Database" > "PostgreSQL"
+3. Railway will automatically create `DATABASE_URL` variable
+
+### 5. Configure Environment Variables on Railway
 
 1. In your Railway project, go to "Variables"
 2. Add your environment variables:
-   - `OMI_API_KEY`: Your Omi API key
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `PHONE_NUMBER`: Your 10-digit phone number
+   - `TEXTBELT_API_KEY`: Your Textbelt API key (or 'textbelt' for free tier)
+   - `OMI_API_KEY`: Your Omi API key (optional)
 
-### 5. Get Your Railway URL
+### 6. Get Your Railway URL
 
 1. Once deployed, Railway will give you a URL like:
    ```
@@ -133,9 +176,15 @@ git push -u origin main
 
 1. **Omi Device sends webhooks** → Transcripts saved to PostgreSQL `transcripts` table
 2. **Every 10 seconds**, background processor checks for new transcripts
-3. **If transcripts found** → Batched and sent to OpenAI GPT-5 with conversation history
-4. **AI responds** → Both user message and AI response saved to `messages` table
-5. **Transcripts marked as processed** and linked to their message
+3. **Activation phrase check** → Only processes if transcript contains "hey jarvis" (or variations)
+4. **Session management** → Retrieves or creates OpenAI Conversation session for this Omi device
+5. **Jarvis processes** → OpenAI Agents SDK automatically:
+   - Loads conversation history from OpenAI
+   - Performs web searches if needed
+   - Can send additional SMS during processing
+6. **Response handling** → AI response is automatically texted to your phone
+7. **Database updates** → User message and AI response saved to `messages` table
+8. **Session persistence** → Conversation ID saved for future interactions
 
 ## API Endpoints
 
@@ -188,31 +237,40 @@ Saved transcript segment abc-123 to database
 ============================================================
 ```
 
-### Every 10 seconds (if new transcripts):
+### Every 10 seconds (if new transcripts with activation phrase):
 ```
 ============================================================
 PROCESSING 2 NEW TRANSCRIPT(S)
 ============================================================
+Activation phrase 'hey jarvis' detected!
 
-SENDING TO AI:
+Creating new conversation for Omi session device_abc123
+
+============================================================
+SENDING TO JARVIS (with Agents SDK):
 ------------------------------------------------------------
-Previous conversation:
-User: Hello
-Assistant: Hi there! How can I help you?
-
-User just said:
-SPEAKER_1: What's the weather like today?
+SPEAKER_1: Hey Jarvis, what's the weather like today?
 ============================================================
 
-AI RESPONSE:
-------------------------------------------------------------
-I'm an AI assistant and don't have access to real-time weather 
-data, but I'd be happy to help you find that information!
+[Jarvis uses web search tool to find current weather]
+
 ============================================================
+JARVIS RESPONSE:
+------------------------------------------------------------
+It's currently 72°F and sunny in San Francisco.
+============================================================
+
+============================================================
+SENDING AI RESPONSE VIA SMS
+============================================================
+Response: It's currently 72°F and sunny in San Francisco.
+============================================================
+
+✅ AI response texted successfully! Text ID: 123456
 
 Saved user message (ID: 3)
 Saved ai message (ID: 4)
-Marked 2 transcripts as processed
+Saved session mapping: device_abc123 -> conv_openai_xyz789
 Successfully processed 2 transcript(s)
 ============================================================
 ```
@@ -236,6 +294,19 @@ python app.py
 - Ensure `Procfile` is in the root directory
 - Check Railway logs for errors
 - Verify environment variables are set correctly
+- Add PostgreSQL database service in Railway
+
+### SMS Not Sending
+- Verify `PHONE_NUMBER` is in correct format (10 digits for US)
+- Check `TEXTBELT_API_KEY` is valid
+- Free tier allows 1 text per day - get paid key at textbelt.com
+- Test SMS with: `python -c "import sms; sms.send_sms('test')"`
+
+### Jarvis Not Responding
+- Ensure you're saying an activation phrase ("hey jarvis")
+- Check console for "Activation phrase detected" message
+- Verify OpenAI API key is valid
+- Check that transcripts contain the activation phrase
 
 ## Project Structure
 
@@ -243,16 +314,20 @@ python app.py
 omi-link/
 ├── app.py                      # Flask web server, webhook receiver
 ├── db.py                       # PostgreSQL database operations
-├── ai_handler.py               # OpenAI GPT-5 API integration
+├── ai_handler.py               # Jarvis AI Agent (OpenAI Agents SDK)
+├── sessions.py                 # OpenAI Conversations session management
+├── tools.py                    # Jarvis tools (@function_tool decorators)
+├── sms.py                      # SMS notifications via Textbelt
 ├── transcript_processor.py     # Background polling (10s interval)
 ├── schema.sql                  # Database table definitions
 ├── requirements.txt            # Python dependencies
 ├── Procfile                    # Railway deployment config
 ├── ENV_TEMPLATE.txt            # Environment variable template
-├── SETUP_INSTRUCTIONS.md       # Detailed setup guide
 ├── .env                        # Your secrets (not committed)
 ├── .gitignore                  # Git ignore rules
-├── database.py                 # OLD: JSON-based (deprecated)
+├── dev/
+│   ├── reset_db.py            # Database cleanup utility
+│   └── test_jarvis.py         # Local testing script
 └── README.md                   # This file
 ```
 
@@ -266,7 +341,92 @@ omi-link/
 ### `messages` Table
 - Stores conversation between user and AI
 - User messages: batched transcripts
-- AI messages: GPT-5 responses
+- AI messages: Jarvis responses
+- Optional: tool_executions tracking
+
+### `sessions` Table
+- Maps Omi device session IDs to OpenAI conversation IDs
+- Enables persistent conversation memory
+- Tracks last usage timestamps
+
+## Jarvis AI Features
+
+### Activation Phrases
+Jarvis only responds when you say one of these phrases:
+- "hey jarvis" / "hey, jarvis"
+- "hi jarvis" / "hi, jarvis"
+- "hello jarvis" / "hello, jarvis"
+- "okay jarvis" / "ok jarvis"
+
+### Available Tools
+
+1. **Web Search** - Automatically searches the web for:
+   - Current weather
+   - News and events
+   - Sports scores
+   - Stock prices
+   - Any real-time information
+
+2. **Send Text Message** - Can send additional SMS during processing:
+   - Status updates ("Looking that up...")
+   - Multi-part responses
+   - Note: Final response is ALWAYS auto-texted
+
+### Conversation Memory
+
+Jarvis remembers your entire conversation history using OpenAI Conversations API:
+```
+You: "Hey Jarvis, my favorite color is blue"
+Jarvis: "Got it, I'll remember that!"
+
+[Later that day...]
+You: "Hey Jarvis, what's my favorite color?"
+Jarvis: "Your favorite color is blue"
+```
+
+Each Omi device has its own conversation thread that persists forever.
+
+## Development & Testing
+
+### Testing Script (`dev/test_jarvis.py`)
+
+Test Jarvis locally without needing webhooks:
+
+**Interactive Mode:**
+```bash
+python dev/test_jarvis.py
+```
+- Start a continuous conversation with Jarvis
+- Type your messages and press Enter
+- Type `new` to start a fresh session
+- Type `exit` or `quit` to stop
+
+**Single Message Mode:**
+```bash
+python dev/test_jarvis.py "Hey Jarvis, what's the weather?"
+```
+- Send a single message and get a response
+- Useful for quick testing
+
+**Note:** The test script bypasses the webhook → transcript processor flow, so:
+- ✅ Jarvis will respond
+- ✅ Sessions will persist
+- ✅ Tools (web search) will work
+- ❌ Auto-SMS won't trigger (only in production flow)
+
+### Database Reset Script (`dev/reset_db.py`)
+
+Clear all data from the database:
+
+```bash
+python dev/reset_db.py
+```
+
+This will:
+- Truncate `transcripts` table
+- Truncate `messages` table
+- Truncate `sessions` table
+- Keep the schema intact
 
 ## License
 
